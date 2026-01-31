@@ -189,14 +189,14 @@ def extra_stats(selected_user, df):
     
     # Message lengths
     message_lengths = df['message'].apply(len)
-    avg_msg_length_chars = round(message_lengths.mean(), 2)
-    max_msg_length_chars = message_lengths.max()
+    avg_msg_length_chars = float(round(message_lengths.mean(), 2))
+    max_msg_length_chars = int(message_lengths.max())
     
     # Word based lengths
     word_counts = df['message'].apply(lambda x: len(x.split()))
-    avg_word_count = round(word_counts.mean(), 2)
-    max_word_count = word_counts.max()
+    avg_word_count = float(round(word_counts.mean(), 2))
+    max_word_count = int(word_counts.max())
     
-    return deleted_count, empty_messages, avg_msg_length_chars, max_msg_length_chars, avg_word_count, max_word_count
+    return int(deleted_count), int(empty_messages), avg_msg_length_chars, max_msg_length_chars, avg_word_count, max_word_count
 
 

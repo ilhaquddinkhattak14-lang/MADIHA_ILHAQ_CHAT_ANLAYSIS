@@ -13,6 +13,34 @@ from typing import List
 
 app = FastAPI(title="WhatsApp Chat Analyzer API")
 
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Request
+
+# Logging middleware to see if requests hit the server
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    print(f"Incoming request: {request.method} {request.url}")
+    try:
+        response = await call_next(request)
+        print(f"Response status: {response.status_code}")
+        return response
+    except Exception as e:
+        print(f"Request failed: {str(e)}")
+        raise e
+
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 from fastapi.responses import JSONResponse
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
@@ -102,8 +130,50 @@ async def analyze_chat(
     # 6. Activity Map
     busy_day = helper.week_activity_map(selected_user, df)
     busy_month = helper.month_activity_map(selected_user, df)
+
+    # 7. Daily Timeline (New)
+    daily_timeline = helper.daily_timeline(selected_user, df)
+
+    # 8. Activity Heatmap (New)
+    heatmap = helper.activity_heatmap(selected_user, df)
+    # Convert pivot table to easy JSON format (e.g. list of records or custom dict)
+    # Heatmap returns a pivot table (DataFrame). to_dict() might need robust handling for frontend.
+    # Let's convert it to a structure: {day: {period: count}}
+    heatmap_data = heatmap.to_dict()
+
+    # 9. Sentiment Analysis (New)
+    sentiment_counts, sentiment_samples = helper.sentiment_analysis(selected_user, df)
     
-    return {
+    # 10. User Detailed Stats (New)
+    # user_detailed_stats takes only df, usually for Overall. If selected_user is specific, it might just return that user or all.
+    # helper.py line 140 says: "This function only makes sense for 'Overall' view"
+    if selected_user == 'Overall':
+        user_stats_df = helper.user_detailed_stats(df)
+        user_stats = user_stats_df.to_dict(orient="records")
+    else:
+        user_stats = []
+
+    # 11. Extra Stats (New)
+    deleted_count, empty_messages, avg_msg_len, max_msg_len, avg_word_count, max_word_count = helper.extra_stats(selected_user, df)
+    
+    import numpy as np
+
+    def convert_numpy(obj):
+        if isinstance(obj, (np.intc, np.intp, np.int8,
+                            np.int16, np.int32, np.int64, np.uint8,
+                            np.uint16, np.uint32, np.uint64)):
+            return int(obj)
+        elif isinstance(obj, (np.float16, np.float32, np.float64)):
+            return float(obj)
+        elif isinstance(obj, (np.ndarray,)): 
+            return obj.tolist()
+        elif isinstance(obj, dict):
+            return {k: convert_numpy(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [convert_numpy(i) for i in obj]
+        return obj
+
+    response_data = {
         "stats": {
             "num_messages": num_messages,
             "num_words": words,
@@ -120,8 +190,25 @@ async def analyze_chat(
         "activity_map": {
             "busy_day": busy_day.to_dict(),
             "busy_month": busy_month.to_dict()
+        },
+        "daily_timeline": daily_timeline.to_dict(orient="records"),
+        "activity_heatmap": heatmap_data,
+        "sentiment": {
+            "counts": sentiment_counts.to_dict(),
+            "samples": sentiment_samples.to_dict(orient="records")
+        },
+        "user_detailed_stats": user_stats,
+        "extra_stats": {
+            "deleted_messages": deleted_count,
+            "empty_messages": empty_messages,
+            "avg_msg_length": avg_msg_len,
+            "max_msg_length": max_msg_len,
+            "avg_word_count": avg_word_count,
+            "max_word_count": max_word_count
         }
     }
+    
+    return convert_numpy(response_data)
 
 if __name__ == "__main__":
     import uvicorn
