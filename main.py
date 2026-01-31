@@ -2,6 +2,7 @@ import streamlit as st
 import preprocessing
 import helper
 import matplotlib.pyplot as plt
+import seaborn as sns
 st.sidebar.title("Whatsapp Chat Analyzer")
 upload_file = st.sidebar.file_uploader("chose a file")
 if upload_file is not None:
@@ -38,6 +39,14 @@ if upload_file is not None:
         plt.xticks(rotation='vertical')
         st.pyplot(fig)
 
+        # daily timeline
+        st.header("Daily Timeline")
+        daily_timeline = helper.daily_timeline(selected_user, df)
+        fig, ax = plt.subplots()
+        ax.plot(daily_timeline['date'], daily_timeline['message'], color='black')
+        plt.xticks(rotation='vertical')
+        st.pyplot(fig)
+
         # activity map
         st.header('Activity Map')
         col1, col2 = st.columns(2)
@@ -56,6 +65,13 @@ if upload_file is not None:
             ax.bar(busy_month.index, busy_month.values,color='red')
             plt.xticks(rotation='vertical')
             st.pyplot(fig)
+
+        # activity heatmap
+        st.header("Weekly Activity Heatmap")
+        user_heatmap = helper.activity_heatmap(selected_user, df)
+        fig, ax = plt.subplots()
+        ax = sns.heatmap(user_heatmap)
+        st.pyplot(fig)
 
         # finding the busiest users in the group
         if selected_user == 'Overall':
@@ -78,8 +94,16 @@ if upload_file is not None:
         fig, ax = plt.subplots()
         ax.imshow(df_wc)   
         ax.axis("off")      
-        st.pyplot(fig)  
+        st.pyplot(fig)
 
+        # most common words
+        st.header('Most Common Words')
+        most_common_df = helper.most_common_words(selected_user, df)
+        fig, ax = plt.subplots()
+        ax.barh(most_common_df[0], most_common_df[1])
+        plt.xticks(rotation='vertical')
+        st.pyplot(fig)
+  
         emoji_df = helper.emoji_helper(selected_user, df)
         st.header("Emoji Analysis")
 
@@ -95,6 +119,18 @@ if upload_file is not None:
 
             fig, ax = plt.subplots()
             ax.pie(top_emojis[1], labels=top_emojis[0], autopct="%0.2f")
+            st.pyplot(fig)
+
+        # sentiment analysis
+        st.header("Sentiment Analysis")
+        sentiment_counts = helper.sentiment_analysis(selected_user, df)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.dataframe(sentiment_counts)
+        with col2:
+            fig, ax = plt.subplots()
+            ax.pie(sentiment_counts.values, labels=sentiment_counts.index, autopct="%0.2f", colors=['#ff9999','#66b3ff','#99ff99'])
             st.pyplot(fig)
 
 

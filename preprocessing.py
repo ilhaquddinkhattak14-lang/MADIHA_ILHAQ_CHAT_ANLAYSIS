@@ -6,7 +6,10 @@ def preprocess(data):
     dates = re.findall(pattern, data)
     dates = [d.replace('\u202f', ' ').strip(' -') for d in dates]
     df = pd.DataFrame({'user_messages': messages, 'message_date': dates})
-    df['message_date'] = pd.to_datetime(df['message_date'], format='%d/%m/%Y, %I:%M %p')
+    try:
+        df['message_date'] = pd.to_datetime(df['message_date'], format='%d/%m/%Y, %I:%M %p')
+    except:
+        df['message_date'] = pd.to_datetime(df['message_date']) # Fallback to auto-detection
     df.rename(columns={'message_date': 'date'}, inplace=True)
     df = df[~df['user_messages'].str.contains(r'[\u0600-\u06FF]', na=False)]
     users = []

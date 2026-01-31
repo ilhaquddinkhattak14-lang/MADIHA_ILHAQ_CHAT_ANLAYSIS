@@ -4,6 +4,18 @@ extract = URLExtract()
 import pandas as pd
 from collections import Counter
 import emoji
+import seaborn as sns
+from textblob import TextBlob
+import nltk
+from nltk.corpus import stopwords
+import string
+
+try:
+    nltk.download('stopwords')
+except:
+    pass
+
+stop_words = set(stopwords.words('english'))
 def fetch_stats(selected_user, df):
     if selected_user != 'Overall':
         df = df[df['user'] == selected_user]
@@ -23,8 +35,20 @@ def most_busy_users(df):
 def create_wordcloud(selected_user,df):
     if selected_user != 'Overall':
         df = df[df['user'] == selected_user]
+
+    temp = df[df['user'] != 'group_notification']
+    temp = temp[temp['message'] != '<Media omitted>\n']
+
+    def remove_stop_words(message):
+        y = []
+        for word in message.lower().split():
+            if word not in stop_words:
+                y.append(word)
+        return " ".join(y)
+
     wc = WordCloud(width=500, height=500, min_font_size=10, background_color='white')
-    df_wc = wc.generate(df['message'].str.cat(sep=" "))
+    temp['message'] = temp['message'].apply(remove_stop_words)
+    df_wc = wc.generate(temp['message'].str.cat(sep=" "))
     return df_wc
 def emoji_helper(selected_user, df):
     if selected_user != 'Overall':
@@ -58,3 +82,62 @@ def month_activity_map(selected_user,df):
         df = df[df['user'] == selected_user]
     return df['month'].value_counts()
 
+def daily_timeline(selected_user, df):
+    if selected_user != 'Overall':
+        df = df[df['user'] == selected_user]
+
+    daily_timeline = df.groupby('date').count()['message'].reset_index()
+    return daily_timeline
+
+def most_common_words(selected_user, df):
+    if selected_user != 'Overall':
+        df = df[df['user'] == selected_user]
+
+    temp = df[df['user'] != 'group_notification']
+    temp = temp[temp['message'] != '<Media omitted>\n']
+
+    words = []
+    for message in temp['message']:
+        for word in message.lower().split():
+            word = word.strip(string.punctuation)
+            if word and word not in stop_words:
+                words.append(word)
+
+    most_common_df = pd.DataFrame(Counter(words).most_common(20))
+    return most_common_df
+
+def activity_heatmap(selected_user, df):
+    if selected_user != 'Overall':
+        df = df[df['user'] == selected_user]
+
+    # Create a period (hour)
+    period = []
+    for hour in df[['day_name', 'hour']]['hour']:
+        if hour == 23:
+            period.append(str(hour) + "-" + str('00'))
+        elif hour == 0:
+            period.append(str('00') + "-" + str(hour + 1))
+        else:
+            period.append(str(hour) + "-" + str(hour + 1))
+
+    df['period'] = period
+    
+    user_heatmap = df.pivot_table(index='day_name', columns='period', values='message', aggfunc='count').fillna(0)
+    return user_heatmap
+
+def sentiment_analysis(selected_user, df):
+    if selected_user != 'Overall':
+        df = df[df['user'] == selected_user]
+
+    def get_sentiment(text):
+        analysis = TextBlob(text)
+        if analysis.sentiment.polarity > 0:
+            return 'Positive'
+        elif analysis.sentiment.polarity == 0:
+            return 'Neutral'
+        else:
+            return 'Negative'
+
+    df['sentiment'] = df['message'].apply(get_sentiment)
+    sentiment_counts = df['sentiment'].value_counts()
+    return sentiment_counts
